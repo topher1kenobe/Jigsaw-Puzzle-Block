@@ -1,0 +1,46 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 2,
+	"name": "jigsaw-puzzle/puzzle",
+	"title": "Jigsaw Puzzle",
+	"category": "media",
+	"icon": "screenoptions",
+	"description": "Turn any image into an interactive drag-and-drop jigsaw puzzle with real interlocking pieces.",
+	"keywords": [ "puzzle", "jigsaw", "game", "interactive", "image" ],
+	"version": "1.12.3",
+	"textdomain": "jigsaw-puzzle-block",
+	"attributes": {
+		"rows": {
+			"type": "number",
+			"default": 8
+		},
+		"cols": {
+			"type": "number",
+			"default": 8
+		},
+		"bgColor": {
+			"type": "string",
+			"default": "#ffffff"
+		},
+		"boardColor": {
+			"type": "string",
+			"default": "#ebecfe"
+		},
+		"accentColor": {
+			"type": "string",
+			"default": "#aeb8c2"
+		},
+		"textColor": {
+			"type": "string",
+			"default": "#000000"
+		}
+	},
+	"supports": {
+		"align": [ "wide", "full" ],
+		"html": false
+	},
+	"editorScript": "jigsaw-puzzle-editor-script",
+	"editorStyle": "jigsaw-puzzle-editor-style",
+	"viewScript": "jigsaw-puzzle-view-script",
+	"style": "jigsaw-puzzle-style"
+}

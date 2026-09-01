@@ -1,0 +1,67 @@
+.jigsaw-puzzle-editor-preview {
+	border: 1px dashed var(--jgp-accent, #8c8f94);
+	border-radius: 6px;
+	padding: 16px;
+	background: var(--jgp-bg, #f6f5f1);
+}
+
+.jigsaw-puzzle-editor-note {
+	font-weight: 600;
+	color: var(--jgp-text, #1e1e1e);
+	margin: 0 0 6px;
+}
+
+.jigsaw-puzzle-editor-instructions {
+	color: var(--jgp-text, #1e1e1e);
+	opacity: 0.75;
+	font-size: 13px;
+	margin: 0 0 14px;
+}
+
+.jigsaw-puzzle-editor-mock {
+	display: flex;
+	gap: 14px;
+	align-items: stretch;
+}
+
+.jgp-mock-board {
+	width: 110px;
+	height: 84px;
+	flex-shrink: 0;
+	border-radius: 8px;
+	background: var(--jgp-board, #ebecfe);
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.jgp-mock-tray {
+	flex: 1;
+	min-width: 120px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px;
+	border-radius: 8px;
+	background: rgba(0, 0, 0, 0.04);
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.jgp-mock-piece {
+	width: 30px;
+	height: 24px;
+	border-radius: 4px;
+	background: var(--jgp-accent, #aeb8c2);
+}
+
+.jgp-mock-btn {
+	all: unset;
+	box-sizing: border-box;
+	flex-shrink: 0;
+	align-self: center;
+	background: var(--jgp-accent, #aeb8c2);
+	color: var(--jgp-text, #1e1e1e);
+	padding: 8px 14px;
+	border-radius: 6px;
+	font-size: 12px;
+	font-weight: 600;
+	cursor: default;
+}
