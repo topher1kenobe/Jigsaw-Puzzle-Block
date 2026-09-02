@@ -51,7 +51,6 @@
 .jgp-btn:active{ transform:scale(.98); }
 
 .jgp-progress{
-  margin-left:auto;
   font-size:13px;
   color:var(--jgp-cream-dim);
   white-space:nowrap;
@@ -112,7 +111,7 @@
 .jgp-win-again:hover{ background:#e2e2e2 !important; }
 
 .jgp-tray-wrap{ flex:1; min-width:170px; order:2; }
-.jgp-tray-label{ font-size:13px; color:var(--jgp-cream-dim); margin:0 0 8px; }
+.jgp-tray-label{ font-size:13px; color:var(--jgp-cream-dim); margin:0 0 0 auto; white-space:nowrap; }
 .jgp-tray{
   position:relative;
   padding:0;

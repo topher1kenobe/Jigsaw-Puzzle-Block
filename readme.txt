@@ -4,7 +4,7 @@ Tags: block, gutenberg, puzzle, game, image
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.12.3
+Stable tag: 1.13.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -50,6 +50,16 @@ Yes. Each block instance keeps its own state, so different visitors (or the same
 No. All photo searches go through a REST route registered by this plugin on your own site, which then queries wordpress.org server-side. Visitors' browsers never contact wordpress.org directly.
 
 == Changelog ==
+
+= 1.13.1 =
+* Added a "View Image" button between Shuffle and Bookmark that shows the current puzzle's full source photo in a lightbox with a close X in the top-right corner, so visitors can reference the picture while solving.
+
+= 1.13.0 =
+* Added deep-linking: visiting the page with `?image=<ID>` in the URL loads that specific photo's puzzle directly, skipping the picker. The ID is sanitized client-side (must be a clean positive integer) and validated server-side against the real WordPress.org Photo Directory via a new `/photo` REST route — an ID that doesn't correspond to an actual photo falls back to the normal picker rather than showing anything broken.
+* Added a "Bookmark this image" button next to Shuffle. Clicking it updates the page's URL (without reloading) to include `?image=<ID>` for the current photo, so visitors can bookmark or share a link straight back to that specific puzzle.
+
+= 1.12.4 =
+* Moved the "Pile — drag a piece onto the board" label up into the top controls row, right before the "N of M placed" progress text, instead of sitting on its own line above the tray box.
 
 = 1.12.3 =
 * Fixed WordPress Coding Standards issues in jigsaw-puzzle-block.php: added a missing @package tag, split two multi-item associative arrays (the REST route's `search`/`page` args) onto one line per value, fixed an equals-sign alignment inconsistency, and renamed a `$default` function parameter since `default` is a reserved PHP keyword.

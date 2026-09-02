@@ -7,7 +7,7 @@
 	"icon": "screenoptions",
 	"description": "Turn any image into an interactive drag-and-drop jigsaw puzzle with real interlocking pieces.",
 	"keywords": [ "puzzle", "jigsaw", "game", "interactive", "image" ],
-	"version": "1.12.3",
+	"version": "1.13.1",
 	"textdomain": "jigsaw-puzzle-block",
 	"attributes": {
 		"rows": {

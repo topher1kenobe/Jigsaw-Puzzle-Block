@@ -84,7 +84,39 @@
     });
   }
 
-  function buildPuzzleUI(container, imageUrl, imageAlt, rows, cols, creditLink, onRestart){
+  function openSimpleLightbox(container, imageUrl, imageAlt){
+    var overlay = document.createElement('div');
+    overlay.className = 'jgp-lightbox';
+
+    var box = document.createElement('div');
+    box.className = 'jgp-lightbox-box';
+
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'jgp-lightbox-close';
+    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.textContent = '\u00d7';
+
+    var img = document.createElement('img');
+    img.className = 'jgp-lightbox-img';
+    img.src = imageUrl;
+    img.alt = imageAlt || '';
+
+    box.appendChild(closeBtn);
+    box.appendChild(img);
+    overlay.appendChild(box);
+    container.appendChild(overlay);
+
+    function close(){
+      if(overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+    overlay.addEventListener('click', function(e){
+      if(e.target === overlay) close();
+    });
+    closeBtn.addEventListener('click', close);
+  }
+
+  function buildPuzzleUI(container, imageUrl, imageAlt, rows, cols, creditLink, onRestart, imageId){
     container.classList.add('jgp-app');
     container.innerHTML = '';
 
@@ -94,9 +126,42 @@
     shuffleBtn.type = 'button';
     shuffleBtn.className = 'jgp-btn';
     shuffleBtn.textContent = 'Shuffle pieces';
+
+    var viewImageBtn = document.createElement('button');
+    viewImageBtn.type = 'button';
+    viewImageBtn.className = 'jgp-btn';
+    viewImageBtn.textContent = 'View Image';
+    viewImageBtn.addEventListener('click', function(){
+      openSimpleLightbox(container, imageUrl, imageAlt);
+    });
+
+    var bookmarkBtn = document.createElement('button');
+    bookmarkBtn.type = 'button';
+    bookmarkBtn.className = 'jgp-btn';
+    bookmarkBtn.textContent = 'Bookmark this image';
+    bookmarkBtn.addEventListener('click', function(){
+      if(!imageId) return;
+      var url = new URL(window.location.href);
+      url.searchParams.set('image', imageId);
+      window.history.replaceState(null, '', url.toString());
+      var original = bookmarkBtn.textContent;
+      bookmarkBtn.textContent = 'Link updated \u2014 bookmark this page!';
+      bookmarkBtn.disabled = true;
+      setTimeout(function(){
+        bookmarkBtn.textContent = original;
+        bookmarkBtn.disabled = false;
+      }, 2500);
+    });
+
+    var trayLabel = document.createElement('span');
+    trayLabel.className = 'jgp-tray-label';
+    trayLabel.textContent = 'Pile \u2014 drag a piece onto the board';
     var progressEl = document.createElement('span');
     progressEl.className = 'jgp-progress';
     controls.appendChild(shuffleBtn);
+    controls.appendChild(viewImageBtn);
+    controls.appendChild(bookmarkBtn);
+    controls.appendChild(trayLabel);
     controls.appendChild(progressEl);
 
     var workspace = document.createElement('div');
@@ -125,12 +190,8 @@
 
     var trayWrap = document.createElement('div');
     trayWrap.className = 'jgp-tray-wrap';
-    var trayLabel = document.createElement('p');
-    trayLabel.className = 'jgp-tray-label';
-    trayLabel.textContent = 'Pile \u2014 drag a piece onto the board';
     var trayEl = document.createElement('div');
     trayEl.className = 'jgp-tray';
-    trayWrap.appendChild(trayLabel);
     trayWrap.appendChild(trayEl);
 
     workspace.appendChild(boardWrap);
@@ -575,7 +636,7 @@
     function selectPhoto(photo){
       buildPuzzleUI(container, photo.full, photo.description || '', rows, cols, photo.link || '', function(){
         renderPicker(container, apiUrl, rows, cols);
-      });
+      }, photo.id);
     }
 
     function fetchResultsPage(term, page){
@@ -812,16 +873,61 @@
     runSearch('');
   }
 
+  function getRequestedImageId(){
+    var params = new URLSearchParams(window.location.search);
+    var raw = params.get('image');
+    if(!raw) return 0;
+    raw = raw.trim();
+    // Sanitize: must be a clean positive integer, nothing else (no leading
+    // zeros, no extra characters, capped at a sane length).
+    if(!/^[1-9][0-9]{0,14}$/.test(raw)) return 0;
+    return parseInt(raw, 10);
+  }
+
+  function loadSpecificImage(container, photoApiUrl, apiUrl, rows, cols, imageId){
+    container.classList.add('jgp-app');
+    container.innerHTML = '';
+    var status = document.createElement('p');
+    status.className = 'jgp-picker-status';
+    status.textContent = 'Loading requested photo\u2026';
+    container.appendChild(status);
+
+    var url = photoApiUrl + (photoApiUrl.indexOf('?')===-1 ? '?' : '&') + 'id=' + encodeURIComponent(imageId);
+    fetch(url, { credentials: 'omit' })
+      .then(function(res){
+        if(!res.ok) throw new Error('not found');
+        return res.json();
+      })
+      .then(function(photo){
+        // Validated server-side against the real photo directory: if the ID
+        // didn't correspond to an actual photo, the API call above already
+        // failed (caught below) rather than returning something fabricated.
+        if(!photo || !photo.full) throw new Error('invalid');
+        buildPuzzleUI(container, photo.full, photo.description || '', rows, cols, photo.link || '', function(){
+          renderPicker(container, apiUrl, rows, cols);
+        }, photo.id);
+      })
+      .catch(function(){
+        renderPicker(container, apiUrl, rows, cols);
+      });
+  }
+
   function initAll(){
     var nodes = document.querySelectorAll('.jigsaw-puzzle-app');
+    var requestedImageId = getRequestedImageId();
     nodes.forEach(function(node){
       if(node.getAttribute('data-jgp-ready')) return;
       node.setAttribute('data-jgp-ready','1');
       var apiUrl = node.getAttribute('data-api');
+      var photoApiUrl = node.getAttribute('data-photo-api');
       var rows = parseInt(node.getAttribute('data-rows'),10) || 8;
       var cols = parseInt(node.getAttribute('data-cols'),10) || 8;
       if(!apiUrl) return;
-      renderPicker(node, apiUrl, rows, cols);
+      if(requestedImageId && photoApiUrl){
+        loadSpecificImage(node, photoApiUrl, apiUrl, rows, cols, requestedImageId);
+      } else {
+        renderPicker(node, apiUrl, rows, cols);
+      }
     });
   }
 

@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Jigsaw Puzzle Block
  * Description:       Adds a "Jigsaw Puzzle" block. Each front-end visitor searches the WordPress.org Photo Directory and picks their own photo, which becomes an interactive drag-and-drop jigsaw puzzle with real interlocking pieces that snap together.
- * Version:           1.12.3
+ * Version:           1.13.1
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            topher1kenobe
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'JIGSAW_PUZZLE_BLOCK_VERSION', '1.12.3' );
+define( 'JIGSAW_PUZZLE_BLOCK_VERSION', '1.13.1' );
 define( 'JIGSAW_PUZZLE_BLOCK_DIR', plugin_dir_path( __FILE__ ) );
 define( 'JIGSAW_PUZZLE_BLOCK_URL', plugin_dir_url( __FILE__ ) );
 
@@ -97,8 +97,89 @@ function jigsaw_puzzle_register_routes() {
 			),
 		)
 	);
+
+	register_rest_route(
+		'jigsaw-puzzle/v1',
+		'/photo',
+		array(
+			'methods'             => 'GET',
+			'callback'            => 'jigsaw_puzzle_get_photo_by_id',
+			'permission_callback' => '__return_true',
+			'args'                => array(
+				'id' => array(
+					'type'    => 'integer',
+					'default' => 0,
+				),
+			),
+		)
+	);
 }
 add_action( 'rest_api_init', 'jigsaw_puzzle_register_routes' );
+
+/**
+ * REST callback: fetch a single photo by ID from wordpress.org and validate
+ * that it actually exists, for the ?image= deep-link feature. Never trusts
+ * the ID at face value — a request for a nonexistent or malformed ID gets a
+ * 404 back, which the front end treats as "fall back to the picker".
+ *
+ * @param WP_REST_Request $request Request object.
+ * @return WP_REST_Response|WP_Error
+ */
+function jigsaw_puzzle_get_photo_by_id( $request ) {
+	$id = intval( $request->get_param( 'id' ) );
+	if ( $id <= 0 ) {
+		return new WP_Error( 'jigsaw_puzzle_invalid_id', __( 'Invalid photo ID.', 'jigsaw-puzzle-block' ), array( 'status' => 400 ) );
+	}
+
+	$cache_key = 'jgp_photo_' . $id;
+	$cached    = get_transient( $cache_key );
+	if ( false !== $cached ) {
+		if ( empty( $cached['not_found'] ) ) {
+			return rest_ensure_response( $cached );
+		}
+		return new WP_Error( 'jigsaw_puzzle_not_found', __( 'No photo found with that ID.', 'jigsaw-puzzle-block' ), array( 'status' => 404 ) );
+	}
+
+	$url = add_query_arg(
+		array( '_fields' => 'id,link,content,featured_media,photo-thumbnail-url' ),
+		'https://wordpress.org/photos/wp-json/wp/v2/photos/' . $id
+	);
+
+	$response = wp_remote_get( $url, array( 'timeout' => 12 ) );
+	if ( is_wp_error( $response ) ) {
+		return new WP_Error( 'jigsaw_puzzle_fetch_failed', $response->get_error_message(), array( 'status' => 500 ) );
+	}
+
+	if ( 200 !== wp_remote_retrieve_response_code( $response ) ) {
+		set_transient( $cache_key, array( 'not_found' => true ), 60 * MINUTE_IN_SECONDS );
+		return new WP_Error( 'jigsaw_puzzle_not_found', __( 'No photo found with that ID.', 'jigsaw-puzzle-block' ), array( 'status' => 404 ) );
+	}
+
+	$photo = json_decode( wp_remote_retrieve_body( $response ), true );
+	if ( ! is_array( $photo ) || empty( $photo['id'] ) || intval( $photo['id'] ) !== $id ) {
+		set_transient( $cache_key, array( 'not_found' => true ), 60 * MINUTE_IN_SECONDS );
+		return new WP_Error( 'jigsaw_puzzle_not_found', __( 'No photo found with that ID.', 'jigsaw-puzzle-block' ), array( 'status' => 404 ) );
+	}
+
+	$media_id  = ! empty( $photo['featured_media'] ) ? intval( $photo['featured_media'] ) : 0;
+	$media_map = jigsaw_puzzle_fetch_media_map( array( $media_id ) );
+
+	$result = array(
+		'id'          => $photo['id'],
+		'thumbnail'   => isset( $photo['photo-thumbnail-url'] ) ? $photo['photo-thumbnail-url'] : '',
+		'full'        => isset( $media_map[ $media_id ] ) ? $media_map[ $media_id ] : '',
+		'description' => isset( $photo['content']['rendered'] ) ? wp_strip_all_tags( $photo['content']['rendered'] ) : '',
+		'link'        => isset( $photo['link'] ) ? $photo['link'] : '',
+	);
+
+	if ( empty( $result['full'] ) ) {
+		set_transient( $cache_key, array( 'not_found' => true ), 60 * MINUTE_IN_SECONDS );
+		return new WP_Error( 'jigsaw_puzzle_not_found', __( 'No photo found with that ID.', 'jigsaw-puzzle-block' ), array( 'status' => 404 ) );
+	}
+
+	set_transient( $cache_key, $result, 60 * MINUTE_IN_SECONDS );
+	return rest_ensure_response( $result );
+}
 
 /**
  * REST callback: search wordpress.org/photos and return a trimmed-down
@@ -285,11 +366,12 @@ function jigsaw_puzzle_render_block( $attributes ) {
 
 	$wrapper_attributes = get_block_wrapper_attributes(
 		array(
-			'class'     => 'jigsaw-puzzle-block jigsaw-puzzle-app',
-			'style'     => $style,
-			'data-api'  => esc_url_raw( rest_url( 'jigsaw-puzzle/v1/photos' ) ),
-			'data-rows' => $rows,
-			'data-cols' => $cols,
+			'class'          => 'jigsaw-puzzle-block jigsaw-puzzle-app',
+			'style'          => $style,
+			'data-api'       => esc_url_raw( rest_url( 'jigsaw-puzzle/v1/photos' ) ),
+			'data-photo-api' => esc_url_raw( rest_url( 'jigsaw-puzzle/v1/photo' ) ),
+			'data-rows'      => $rows,
+			'data-cols'      => $cols,
 		)
 	);
 
