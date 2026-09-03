@@ -4,7 +4,7 @@ Tags: block, gutenberg, puzzle, game, image
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.16.0
+Stable tag: 1.18.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -33,6 +33,10 @@ into place.
 
 == Frequently Asked Questions ==
 
+= Can I link directly to a specific photo's puzzle? =
+
+Yes. Add `?image=<ID>` to any page containing the block (the ID is the WordPress.org photo's numeric ID) and that puzzle loads directly, skipping the picker. Use the "Bookmark this image" button while solving a puzzle to get this link for the current photo. If Yoast SEO is active, visiting a page this way also rewrites the og:image/twitter:image and og:description/twitter:description social sharing tags: the image becomes that specific photo, and the description becomes "Assemble this jigsaw puzzle!" followed by the photo's own description.
+
 = Where do the photos come from? =
 
 The [WordPress.org Photo Directory](https://wordpress.org/photos/), a library of free photos contributed by the WordPress community. The plugin never lets visitors upload their own images or pick from your Media Library — only that directory.
@@ -50,6 +54,12 @@ Yes. Each block instance keeps its own state, so different visitors (or the same
 No. All photo searches go through a REST route registered by this plugin on your own site, which then queries wordpress.org server-side. Visitors' browsers never contact wordpress.org directly.
 
 == Changelog ==
+
+= 1.18.0 =
+* When a page is visited with ?image=<ID>, the og:description/twitter:description are now also rewritten to "Assemble this jigsaw puzzle!" followed by the photo's own description/alt text. Uses Yoast's current wpseo_frontend_presentation object (open_graph_description/twitter_description properties) as the primary mechanism, with the legacy wpseo_opengraph_desc string filter kept as a harmless fallback for older Yoast installs (it was deprecated in Yoast SEO 14.0).
+
+= 1.17.0 =
+* When a page is visited with ?image=<ID> and Yoast SEO is active, the og:image and twitter:image meta tags are now rewritten to use that specific puzzle photo, via Yoast's official wpseo_opengraph_image, wpseo_twitter_image, and wpseo_add_opengraph_images filters. Falls through untouched if there's no ?image= param, if the ID doesn't resolve to a real photo, or if the value is malformed (validated with the same sanitization used for the deep-link feature itself, before any request is made).
 
 = 1.16.0 =
 * The "Solved!" message no longer appears as an inline pill above the board. It now opens in a modal (matching the bookmark/image-preview modal style) with a close X in the top-right corner, and "Do Another Puzzle" is a proper button inside it instead of an inline link. The modal appears once per solve; shuffling resets it so a fresh solve can trigger it again.

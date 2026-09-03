@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Jigsaw Puzzle Block
  * Description:       Adds a "Jigsaw Puzzle" block. Each front-end visitor searches the WordPress.org Photo Directory and picks their own photo, which becomes an interactive drag-and-drop jigsaw puzzle with real interlocking pieces that snap together.
- * Version:           1.16.0
+ * Version:           1.18.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            topher1kenobe
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'JIGSAW_PUZZLE_BLOCK_VERSION', '1.16.0' );
+define( 'JIGSAW_PUZZLE_BLOCK_VERSION', '1.18.0' );
 define( 'JIGSAW_PUZZLE_BLOCK_DIR', plugin_dir_path( __FILE__ ) );
 define( 'JIGSAW_PUZZLE_BLOCK_URL', plugin_dir_url( __FILE__ ) );
 
@@ -127,17 +127,34 @@ add_action( 'rest_api_init', 'jigsaw_puzzle_register_routes' );
  */
 function jigsaw_puzzle_get_photo_by_id( $request ) {
 	$id = intval( $request->get_param( 'id' ) );
+	$photo = jigsaw_puzzle_fetch_photo_by_id( $id );
+
+	if ( false === $photo ) {
+		return new WP_Error( 'jigsaw_puzzle_not_found', __( 'No photo found with that ID.', 'jigsaw-puzzle-block' ), array( 'status' => 404 ) );
+	}
+
+	return rest_ensure_response( $photo );
+}
+
+/**
+ * Resolve a wordpress.org photo ID to its data (full image URL, thumbnail,
+ * description, link), validating it against the real Photo Directory and
+ * caching the result (including negative "not found" results) for an hour.
+ * Used both by the /photo REST route and the Open Graph image override.
+ *
+ * @param int $id Photo ID.
+ * @return array|false Photo data array, or false if invalid/not found.
+ */
+function jigsaw_puzzle_fetch_photo_by_id( $id ) {
+	$id = intval( $id );
 	if ( $id <= 0 ) {
-		return new WP_Error( 'jigsaw_puzzle_invalid_id', __( 'Invalid photo ID.', 'jigsaw-puzzle-block' ), array( 'status' => 400 ) );
+		return false;
 	}
 
 	$cache_key = 'jgp_photo_' . $id;
 	$cached    = get_transient( $cache_key );
 	if ( false !== $cached ) {
-		if ( empty( $cached['not_found'] ) ) {
-			return rest_ensure_response( $cached );
-		}
-		return new WP_Error( 'jigsaw_puzzle_not_found', __( 'No photo found with that ID.', 'jigsaw-puzzle-block' ), array( 'status' => 404 ) );
+		return empty( $cached['not_found'] ) ? $cached : false;
 	}
 
 	$url = add_query_arg(
@@ -147,18 +164,18 @@ function jigsaw_puzzle_get_photo_by_id( $request ) {
 
 	$response = wp_remote_get( $url, array( 'timeout' => 12 ) );
 	if ( is_wp_error( $response ) ) {
-		return new WP_Error( 'jigsaw_puzzle_fetch_failed', $response->get_error_message(), array( 'status' => 500 ) );
+		return false;
 	}
 
 	if ( 200 !== wp_remote_retrieve_response_code( $response ) ) {
 		set_transient( $cache_key, array( 'not_found' => true ), 60 * MINUTE_IN_SECONDS );
-		return new WP_Error( 'jigsaw_puzzle_not_found', __( 'No photo found with that ID.', 'jigsaw-puzzle-block' ), array( 'status' => 404 ) );
+		return false;
 	}
 
 	$photo = json_decode( wp_remote_retrieve_body( $response ), true );
 	if ( ! is_array( $photo ) || empty( $photo['id'] ) || intval( $photo['id'] ) !== $id ) {
 		set_transient( $cache_key, array( 'not_found' => true ), 60 * MINUTE_IN_SECONDS );
-		return new WP_Error( 'jigsaw_puzzle_not_found', __( 'No photo found with that ID.', 'jigsaw-puzzle-block' ), array( 'status' => 404 ) );
+		return false;
 	}
 
 	$media_id  = ! empty( $photo['featured_media'] ) ? intval( $photo['featured_media'] ) : 0;
@@ -174,12 +191,133 @@ function jigsaw_puzzle_get_photo_by_id( $request ) {
 
 	if ( empty( $result['full'] ) ) {
 		set_transient( $cache_key, array( 'not_found' => true ), 60 * MINUTE_IN_SECONDS );
-		return new WP_Error( 'jigsaw_puzzle_not_found', __( 'No photo found with that ID.', 'jigsaw-puzzle-block' ), array( 'status' => 404 ) );
+		return false;
 	}
 
 	set_transient( $cache_key, $result, 60 * MINUTE_IN_SECONDS );
-	return rest_ensure_response( $result );
+	return $result;
 }
+
+/**
+ * Read and sanitize the ?image= query var: must be a clean positive
+ * integer, mirroring the client-side validation used for the deep-link
+ * feature. Never trusts the raw value.
+ *
+ * @return int Sanitized image ID, or 0 if absent/malformed.
+ */
+function jigsaw_puzzle_get_requested_image_id() {
+	if ( empty( $_GET['image'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return 0;
+	}
+	$raw = sanitize_text_field( wp_unslash( $_GET['image'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	if ( ! preg_match( '/^[1-9][0-9]{0,14}$/', $raw ) ) {
+		return 0;
+	}
+	return (int) $raw;
+}
+
+/**
+ * Override Yoast SEO's og:image (and twitter:image) with the puzzle photo
+ * when the current page was requested with ?image=<ID>.
+ *
+ * @param string $image The image URL Yoast would otherwise use.
+ * @return string
+ */
+function jigsaw_puzzle_override_social_image( $image ) {
+	$id = jigsaw_puzzle_get_requested_image_id();
+	if ( ! $id ) {
+		return $image;
+	}
+	$photo = jigsaw_puzzle_fetch_photo_by_id( $id );
+	if ( ! $photo || empty( $photo['full'] ) ) {
+		return $image;
+	}
+	return $photo['full'];
+}
+add_filter( 'wpseo_opengraph_image', 'jigsaw_puzzle_override_social_image' );
+add_filter( 'wpseo_twitter_image', 'jigsaw_puzzle_override_social_image' );
+
+/**
+ * Add the puzzle photo to Yoast's og:image list when the page has ?image=
+ * set, covering pages that wouldn't otherwise have any og:image at all
+ * (wpseo_opengraph_image only replaces an image that already exists).
+ *
+ * @param WPSEO_OpenGraph_Image $image_container Yoast's image container.
+ */
+function jigsaw_puzzle_add_social_image( $image_container ) {
+	$id = jigsaw_puzzle_get_requested_image_id();
+	if ( ! $id ) {
+		return;
+	}
+	$photo = jigsaw_puzzle_fetch_photo_by_id( $id );
+	if ( $photo && ! empty( $photo['full'] ) ) {
+		$image_container->add_image( $photo['full'] );
+	}
+}
+add_filter( 'wpseo_add_opengraph_images', 'jigsaw_puzzle_add_social_image' );
+
+/**
+ * Build the "Assemble this jigsaw puzzle!" description text for a photo,
+ * prefixed exactly as requested, followed by the photo's own description
+ * (used as alt text elsewhere in the plugin) when available.
+ *
+ * @param array $photo Photo data as returned by jigsaw_puzzle_fetch_photo_by_id().
+ * @return string
+ */
+function jigsaw_puzzle_build_social_description( $photo ) {
+	$prefix = __( 'Assemble this jigsaw puzzle!', 'jigsaw-puzzle-block' );
+	$alt    = ! empty( $photo['description'] ) ? $photo['description'] : '';
+	return trim( $prefix . ( '' !== $alt ? ' ' . $alt : '' ) );
+}
+
+/**
+ * Override Yoast's og:description/twitter:description (legacy string
+ * filter). wpseo_opengraph_desc was deprecated in Yoast SEO 14.0, so this
+ * is kept only as a harmless fallback for older installs; the
+ * wpseo_frontend_presentation hook below is the primary mechanism.
+ *
+ * @param string $desc The description Yoast would otherwise use.
+ * @return string
+ */
+function jigsaw_puzzle_override_social_description( $desc ) {
+	$id = jigsaw_puzzle_get_requested_image_id();
+	if ( ! $id ) {
+		return $desc;
+	}
+	$photo = jigsaw_puzzle_fetch_photo_by_id( $id );
+	if ( ! $photo ) {
+		return $desc;
+	}
+	return jigsaw_puzzle_build_social_description( $photo );
+}
+add_filter( 'wpseo_opengraph_desc', 'jigsaw_puzzle_override_social_description' );
+
+/**
+ * Override og:description/twitter:description via Yoast's current
+ * (non-deprecated) frontend presentation object.
+ *
+ * @param object $presentation Yoast's Indexable_Presentation object.
+ * @return object
+ */
+function jigsaw_puzzle_override_presentation_description( $presentation ) {
+	$id = jigsaw_puzzle_get_requested_image_id();
+	if ( ! $id ) {
+		return $presentation;
+	}
+	$photo = jigsaw_puzzle_fetch_photo_by_id( $id );
+	if ( ! $photo ) {
+		return $presentation;
+	}
+	$desc = jigsaw_puzzle_build_social_description( $photo );
+	if ( property_exists( $presentation, 'open_graph_description' ) ) {
+		$presentation->open_graph_description = $desc;
+	}
+	if ( property_exists( $presentation, 'twitter_description' ) ) {
+		$presentation->twitter_description = $desc;
+	}
+	return $presentation;
+}
+add_filter( 'wpseo_frontend_presentation', 'jigsaw_puzzle_override_presentation_description' );
 
 /**
  * REST callback: search wordpress.org/photos and return a trimmed-down
