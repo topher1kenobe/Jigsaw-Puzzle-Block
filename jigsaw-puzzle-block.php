@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Jigsaw Puzzle Block
  * Description:       Adds a "Jigsaw Puzzle" block. Each front-end visitor searches the WordPress.org Photo Directory and picks their own photo, which becomes an interactive drag-and-drop jigsaw puzzle with real interlocking pieces that snap together.
- * Version:           1.18.0
+ * Version:           1.19.1
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            topher1kenobe
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'JIGSAW_PUZZLE_BLOCK_VERSION', '1.18.0' );
+define( 'JIGSAW_PUZZLE_BLOCK_VERSION', '1.19.1' );
 define( 'JIGSAW_PUZZLE_BLOCK_DIR', plugin_dir_path( __FILE__ ) );
 define( 'JIGSAW_PUZZLE_BLOCK_URL', plugin_dir_url( __FILE__ ) );
 
@@ -234,8 +234,6 @@ function jigsaw_puzzle_override_social_image( $image ) {
 	}
 	return $photo['full'];
 }
-add_filter( 'wpseo_opengraph_image', 'jigsaw_puzzle_override_social_image' );
-add_filter( 'wpseo_twitter_image', 'jigsaw_puzzle_override_social_image' );
 
 /**
  * Add the puzzle photo to Yoast's og:image list when the page has ?image=
@@ -254,7 +252,6 @@ function jigsaw_puzzle_add_social_image( $image_container ) {
 		$image_container->add_image( $photo['full'] );
 	}
 }
-add_filter( 'wpseo_add_opengraph_images', 'jigsaw_puzzle_add_social_image' );
 
 /**
  * Build the "Assemble this jigsaw puzzle!" description text for a photo,
@@ -290,7 +287,6 @@ function jigsaw_puzzle_override_social_description( $desc ) {
 	}
 	return jigsaw_puzzle_build_social_description( $photo );
 }
-add_filter( 'wpseo_opengraph_desc', 'jigsaw_puzzle_override_social_description' );
 
 /**
  * Override og:description/twitter:description via Yoast's current
@@ -317,7 +313,85 @@ function jigsaw_puzzle_override_presentation_description( $presentation ) {
 	}
 	return $presentation;
 }
-add_filter( 'wpseo_frontend_presentation', 'jigsaw_puzzle_override_presentation_description' );
+
+/**
+ * Register the Yoast SEO integration, only when Yoast is actually active.
+ * WPSEO_VERSION is the constant Yoast itself has used for this exact
+ * "is Yoast active" check since its own companion-plugin days.
+ */
+function jigsaw_puzzle_register_yoast_integration() {
+	if ( ! defined( 'WPSEO_VERSION' ) ) {
+		return;
+	}
+	add_filter( 'wpseo_opengraph_image', 'jigsaw_puzzle_override_social_image' );
+	add_filter( 'wpseo_twitter_image', 'jigsaw_puzzle_override_social_image' );
+	add_filter( 'wpseo_add_opengraph_images', 'jigsaw_puzzle_add_social_image' );
+	add_filter( 'wpseo_opengraph_desc', 'jigsaw_puzzle_override_social_description' );
+	add_filter( 'wpseo_frontend_presentation', 'jigsaw_puzzle_override_presentation_description' );
+}
+add_action( 'plugins_loaded', 'jigsaw_puzzle_register_yoast_integration' );
+
+/**
+ * Override All in One SEO's Facebook/Open Graph tags (og:image,
+ * og:description) with the puzzle photo when the page has ?image=<ID>.
+ *
+ * @param array $tags The Facebook/Open Graph tags AIOSEO would output.
+ * @return array
+ */
+function jigsaw_puzzle_aioseo_facebook_tags( $tags ) {
+	$id = jigsaw_puzzle_get_requested_image_id();
+	if ( ! $id ) {
+		return $tags;
+	}
+	$photo = jigsaw_puzzle_fetch_photo_by_id( $id );
+	if ( ! $photo ) {
+		return $tags;
+	}
+	if ( ! empty( $photo['full'] ) ) {
+		$tags['og:image'] = $photo['full'];
+	}
+	$tags['og:description'] = jigsaw_puzzle_build_social_description( $photo );
+	return $tags;
+}
+
+/**
+ * Override All in One SEO's Twitter tags (twitter:image,
+ * twitter:description) with the puzzle photo when the page has
+ * ?image=<ID>.
+ *
+ * @param array $tags The Twitter tags AIOSEO would output.
+ * @return array
+ */
+function jigsaw_puzzle_aioseo_twitter_tags( $tags ) {
+	$id = jigsaw_puzzle_get_requested_image_id();
+	if ( ! $id ) {
+		return $tags;
+	}
+	$photo = jigsaw_puzzle_fetch_photo_by_id( $id );
+	if ( ! $photo ) {
+		return $tags;
+	}
+	if ( ! empty( $photo['full'] ) ) {
+		$tags['twitter:image'] = $photo['full'];
+	}
+	$tags['twitter:description'] = jigsaw_puzzle_build_social_description( $photo );
+	return $tags;
+}
+
+/**
+ * Register the All in One SEO integration, only when AIOSEO is actually
+ * active (checked both by its version constant and its legacy class name,
+ * matching the detection pattern used elsewhere in the WordPress
+ * ecosystem for this plugin).
+ */
+function jigsaw_puzzle_register_aioseo_integration() {
+	if ( ! defined( 'AIOSEO_VERSION' ) && ! class_exists( 'All_in_One_SEO_Pack' ) ) {
+		return;
+	}
+	add_filter( 'aioseo_facebook_tags', 'jigsaw_puzzle_aioseo_facebook_tags' );
+	add_filter( 'aioseo_twitter_tags', 'jigsaw_puzzle_aioseo_twitter_tags' );
+}
+add_action( 'plugins_loaded', 'jigsaw_puzzle_register_aioseo_integration' );
 
 /**
  * REST callback: search wordpress.org/photos and return a trimmed-down

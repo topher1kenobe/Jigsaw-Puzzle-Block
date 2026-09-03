@@ -141,6 +141,10 @@
     box.appendChild(actionRow);
     overlay.appendChild(box);
     container.appendChild(overlay);
+    // Force a reflow so the transition animates from the initial
+    // (hidden) state instead of jumping straight to visible.
+    overlay.offsetHeight; // eslint-disable-line no-unused-expressions
+    overlay.classList.add('show');
 
     function close(){
       if(overlay.parentNode) overlay.parentNode.removeChild(overlay);
@@ -198,6 +202,10 @@
     box.appendChild(row);
     overlay.appendChild(box);
     container.appendChild(overlay);
+    // Force a reflow so the transition animates from the initial
+    // (hidden) state instead of jumping straight to visible.
+    overlay.offsetHeight; // eslint-disable-line no-unused-expressions
+    overlay.classList.add('show');
 
     function close(){
       if(overlay.parentNode) overlay.parentNode.removeChild(overlay);
@@ -230,6 +238,10 @@
     box.appendChild(img);
     overlay.appendChild(box);
     container.appendChild(overlay);
+    // Force a reflow so the transition animates from the initial
+    // (hidden) state instead of jumping straight to visible.
+    overlay.offsetHeight; // eslint-disable-line no-unused-expressions
+    overlay.classList.add('show');
 
     function close(){
       if(overlay.parentNode) overlay.parentNode.removeChild(overlay);
@@ -877,6 +889,10 @@
       box.appendChild(actions);
       overlay.appendChild(box);
       container.appendChild(overlay);
+      // Force a reflow so the transition animates from the initial
+      // (hidden) state instead of jumping straight to visible.
+      overlay.offsetHeight; // eslint-disable-line no-unused-expressions
+      overlay.classList.add('show');
 
       function close(){
         if(overlay.parentNode) overlay.parentNode.removeChild(overlay);

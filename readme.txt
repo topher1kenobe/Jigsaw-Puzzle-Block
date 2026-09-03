@@ -4,7 +4,7 @@ Tags: block, gutenberg, puzzle, game, image
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.18.0
+Stable tag: 1.19.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -35,7 +35,7 @@ into place.
 
 = Can I link directly to a specific photo's puzzle? =
 
-Yes. Add `?image=<ID>` to any page containing the block (the ID is the WordPress.org photo's numeric ID) and that puzzle loads directly, skipping the picker. Use the "Bookmark this image" button while solving a puzzle to get this link for the current photo. If Yoast SEO is active, visiting a page this way also rewrites the og:image/twitter:image and og:description/twitter:description social sharing tags: the image becomes that specific photo, and the description becomes "Assemble this jigsaw puzzle!" followed by the photo's own description.
+Yes. Add `?image=<ID>` to any page containing the block (the ID is the WordPress.org photo's numeric ID) and that puzzle loads directly, skipping the picker. Use the "Bookmark this image" button while solving a puzzle to get this link for the current photo. If Yoast SEO or All in One SEO is active, visiting a page this way also rewrites that plugin's og:image/twitter:image and og:description/twitter:description social sharing tags: the image becomes that specific photo, and the description becomes "Assemble this jigsaw puzzle!" followed by the photo's own description. If neither plugin is active, this part simply has no effect — the deep-linking itself still works either way.
 
 = Where do the photos come from? =
 
@@ -54,6 +54,13 @@ Yes. Each block instance keeps its own state, so different visitors (or the same
 No. All photo searches go through a REST route registered by this plugin on your own site, which then queries wordpress.org server-side. Visitors' browsers never contact wordpress.org directly.
 
 == Changelog ==
+
+= 1.19.1 =
+* All modals (Solved!, image preview, bookmark) now ease in with a fade + subtle scale-up over about half a second, instead of appearing instantly.
+
+= 1.19.0 =
+* Yoast SEO integration is now only registered when Yoast is actually active (checked via the WPSEO_VERSION constant, the same technique Yoast's own companion plugins have historically used), instead of always registering harmless-but-unused filters.
+* Added equivalent support for All in One SEO (AIOSEO): og:image/og:description and twitter:image/twitter:description are rewritten the same way via AIOSEO's own aioseo_facebook_tags and aioseo_twitter_tags filters, only registered when AIOSEO is detected (via the AIOSEO_VERSION constant or its legacy class name).
 
 = 1.18.0 =
 * When a page is visited with ?image=<ID>, the og:description/twitter:description are now also rewritten to "Assemble this jigsaw puzzle!" followed by the photo's own description/alt text. Uses Yoast's current wpseo_frontend_presentation object (open_graph_description/twitter_description properties) as the primary mechanism, with the legacy wpseo_opengraph_desc string filter kept as a harmless fallback for older Yoast installs (it was deprecated in Yoast SEO 14.0).

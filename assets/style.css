@@ -211,10 +211,16 @@
   justify-content:center;
   padding:24px;
   z-index:100000;
+  opacity:0;
+  transition:opacity .5s ease;
 }
+.jgp-lightbox.show{ opacity:1; }
+.jgp-lightbox.show .jgp-lightbox-box{ transform:scale(1); }
 .jgp-lightbox-box{
   position:relative;
   max-width:min(90vw, 900px);
+  transform:scale(.96);
+  transition:transform .5s ease;
   max-height:90vh;
   display:flex;
   flex-direction:column;
