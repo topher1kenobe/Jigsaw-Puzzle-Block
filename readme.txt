@@ -4,7 +4,7 @@ Tags: block, gutenberg, puzzle, game, image
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.13.1
+Stable tag: 1.16.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -50,6 +50,22 @@ Yes. Each block instance keeps its own state, so different visitors (or the same
 No. All photo searches go through a REST route registered by this plugin on your own site, which then queries wordpress.org server-side. Visitors' browsers never contact wordpress.org directly.
 
 == Changelog ==
+
+= 1.16.0 =
+* The "Solved!" message no longer appears as an inline pill above the board. It now opens in a modal (matching the bookmark/image-preview modal style) with a close X in the top-right corner, and "Do Another Puzzle" is a proper button inside it instead of an inline link. The modal appears once per solve; shuffling resets it so a fresh solve can trigger it again.
+
+= 1.15.1 =
+* The bookmark modal's Copy button now sits below the URL link instead of beside it.
+* Extended the button-color fix from :hover to :active and :focus/:focus-visible too — the same theme-vs-class specificity issue that caused a blue hover was likely also showing up as a colored press/click state.
+
+= 1.15.0 =
+* "Bookmark this image" no longer rewrites the address bar. It now opens a modal showing the shareable URL as a clickable link, with a "Copy" button next to it (using the Clipboard API with a textarea-based fallback for older browsers).
+
+= 1.14.1 =
+* Fixed buttons showing a blue background on hover on some themes. A theme's `button:hover` selector can actually outrank a plain `.jgp-btn` class in CSS specificity (element+pseudo-class beats a lone class when compared column-by-column), even though the class wins at rest. Added an explicit `.jgp-btn:hover` rule (forcing white background, black text) with higher specificity plus `!important`, so it can't be overridden the same way.
+
+= 1.14.0 =
+* The board is now a fixed 700px wide whenever it sits beside the tray, instead of scaling proportionally with the container's width. The tray now absorbs all remaining space via flex instead of getting a proportional share, so widening the page grows the tray, not the board. Below the point where a 700px board plus a minimum-width tray no longer fit side by side, it still stacks with the board at full width, as before.
 
 = 1.13.1 =
 * Added a "View Image" button between Shuffle and Bookmark that shows the current puzzle's full source photo in a lightbox with a close X in the top-right corner, so visitors can reference the picture while solving.

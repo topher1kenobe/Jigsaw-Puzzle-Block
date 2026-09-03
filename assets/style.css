@@ -48,6 +48,13 @@
   cursor:pointer;
   transition:background .15s ease;
 }
+.jgp-btn:hover,
+.jgp-btn:active,
+.jgp-btn:focus,
+.jgp-btn:focus-visible{
+  background:#ffffff !important;
+  color:#111111 !important;
+}
 .jgp-btn:active{ transform:scale(.98); }
 
 .jgp-progress{
@@ -76,39 +83,6 @@
   border-radius:2px;
   pointer-events:none;
 }
-.jgp-win-banner{
-  position:absolute;
-  top:-54px;
-  left:0;
-  right:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:12px;
-  flex-wrap:wrap;
-  opacity:0;
-  transform:translateY(6px);
-  transition:opacity .4s ease, transform .4s ease;
-  pointer-events:none;
-}
-.jgp-win-banner.show{ opacity:1; transform:translateY(0); pointer-events:auto; }
-.jgp-win-text{
-  font-family:Georgia,serif;
-  font-size:18px;
-  color:#ffffff;
-  background:rgba(20,16,12,.9);
-  padding:8px 18px;
-  border-radius:999px;
-  box-shadow:0 4px 14px rgba(0,0,0,.35);
-  white-space:nowrap;
-}
-.jgp-win-again{
-  background:#ffffff !important;
-  border:1px solid rgba(0,0,0,.15) !important;
-  color:#111111 !important;
-  box-shadow:0 2px 8px rgba(0,0,0,.25);
-}
-.jgp-win-again:hover{ background:#e2e2e2 !important; }
 
 .jgp-tray-wrap{ flex:1; min-width:170px; order:2; }
 .jgp-tray-label{ font-size:13px; color:var(--jgp-cream-dim); margin:0 0 0 auto; white-space:nowrap; }
@@ -273,6 +247,43 @@
   min-height:16px;
   margin:0;
 }
+.jgp-bookmark-box{
+  position:relative;
+  background:#ffffff;
+  color:#111111;
+  padding:26px 22px 22px;
+  border-radius:10px;
+  max-width:min(90vw, 560px);
+  width:100%;
+  box-shadow:0 10px 40px rgba(0,0,0,.5);
+}
+.jgp-bookmark-box .jgp-lightbox-close{
+  border-color:rgba(0,0,0,.15);
+  box-shadow:0 2px 8px rgba(0,0,0,.25);
+}
+.jgp-bookmark-title{
+  margin:0 0 16px;
+  font-family:Georgia,serif;
+  font-size:18px;
+  font-weight:600;
+}
+.jgp-bookmark-row{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:12px;
+}
+.jgp-bookmark-row .jgp-btn{
+  align-self:flex-start;
+}
+.jgp-bookmark-link{
+  width:100%;
+  overflow-wrap:anywhere;
+  color:#1a56db;
+  text-decoration:underline;
+  font-size:14px;
+}
+
 .jgp-lightbox-close{
   all:unset;
   position:absolute;

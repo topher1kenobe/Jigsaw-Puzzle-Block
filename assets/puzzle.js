@@ -84,6 +84,130 @@
     });
   }
 
+  function copyTextToClipboard(text, done){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done).catch(function(){
+        copyTextToClipboardFallback(text, done);
+      });
+    } else {
+      copyTextToClipboardFallback(text, done);
+    }
+  }
+
+  function copyTextToClipboardFallback(text, done){
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand('copy'); } catch(e){ /* no-op: best effort */ }
+    document.body.removeChild(ta);
+    done();
+  }
+
+  function openWinModal(container, onRestart){
+    var overlay = document.createElement('div');
+    overlay.className = 'jgp-lightbox';
+
+    var box = document.createElement('div');
+    box.className = 'jgp-lightbox-box jgp-bookmark-box';
+
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'jgp-lightbox-close';
+    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.textContent = '\u00d7';
+
+    var title = document.createElement('p');
+    title.className = 'jgp-bookmark-title';
+    title.textContent = 'Solved! Nicely done.';
+
+    var actionRow = document.createElement('div');
+    actionRow.className = 'jgp-bookmark-row';
+    var againBtn = document.createElement('button');
+    againBtn.type = 'button';
+    againBtn.className = 'jgp-btn';
+    againBtn.textContent = 'Do Another Puzzle';
+    againBtn.addEventListener('click', function(){
+      close();
+      if(onRestart) onRestart();
+    });
+    actionRow.appendChild(againBtn);
+
+    box.appendChild(closeBtn);
+    box.appendChild(title);
+    box.appendChild(actionRow);
+    overlay.appendChild(box);
+    container.appendChild(overlay);
+
+    function close(){
+      if(overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+    overlay.addEventListener('click', function(e){
+      if(e.target === overlay) close();
+    });
+    closeBtn.addEventListener('click', close);
+  }
+
+  function openBookmarkModal(container, url){
+    var overlay = document.createElement('div');
+    overlay.className = 'jgp-lightbox';
+
+    var box = document.createElement('div');
+    box.className = 'jgp-lightbox-box jgp-bookmark-box';
+
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'jgp-lightbox-close';
+    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.textContent = '\u00d7';
+
+    var title = document.createElement('p');
+    title.className = 'jgp-bookmark-title';
+    title.textContent = 'Bookmark this puzzle';
+
+    var row = document.createElement('div');
+    row.className = 'jgp-bookmark-row';
+
+    var link = document.createElement('a');
+    link.className = 'jgp-bookmark-link';
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = url;
+
+    var copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'jgp-btn jgp-btn-sm';
+    copyBtn.textContent = 'Copy';
+    copyBtn.addEventListener('click', function(){
+      copyTextToClipboard(url, function(){
+        var original = copyBtn.textContent;
+        copyBtn.textContent = 'Copied!';
+        setTimeout(function(){ copyBtn.textContent = original; }, 2000);
+      });
+    });
+
+    row.appendChild(link);
+    row.appendChild(copyBtn);
+
+    box.appendChild(closeBtn);
+    box.appendChild(title);
+    box.appendChild(row);
+    overlay.appendChild(box);
+    container.appendChild(overlay);
+
+    function close(){
+      if(overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    }
+    overlay.addEventListener('click', function(e){
+      if(e.target === overlay) close();
+    });
+    closeBtn.addEventListener('click', close);
+  }
+
   function openSimpleLightbox(container, imageUrl, imageAlt){
     var overlay = document.createElement('div');
     overlay.className = 'jgp-lightbox';
@@ -143,14 +267,7 @@
       if(!imageId) return;
       var url = new URL(window.location.href);
       url.searchParams.set('image', imageId);
-      window.history.replaceState(null, '', url.toString());
-      var original = bookmarkBtn.textContent;
-      bookmarkBtn.textContent = 'Link updated \u2014 bookmark this page!';
-      bookmarkBtn.disabled = true;
-      setTimeout(function(){
-        bookmarkBtn.textContent = original;
-        bookmarkBtn.disabled = false;
-      }, 2500);
+      openBookmarkModal(container, url.toString());
     });
 
     var trayLabel = document.createElement('span');
@@ -169,23 +286,8 @@
 
     var boardWrap = document.createElement('div');
     boardWrap.className = 'jgp-board-wrap';
-    var winBanner = document.createElement('div');
-    winBanner.className = 'jgp-win-banner';
-    var winText = document.createElement('span');
-    winText.className = 'jgp-win-text';
-    winText.textContent = 'Solved! Nicely done.';
-    var againBtn = document.createElement('button');
-    againBtn.type = 'button';
-    againBtn.className = 'jgp-btn jgp-btn-sm jgp-win-again';
-    againBtn.textContent = 'Do Another Puzzle';
-    againBtn.addEventListener('click', function(){
-      if(onRestart) onRestart();
-    });
-    winBanner.appendChild(winText);
-    winBanner.appendChild(againBtn);
     var boardEl = document.createElement('div');
     boardEl.className = 'jgp-board';
-    boardWrap.appendChild(winBanner);
     boardWrap.appendChild(boardEl);
 
     var trayWrap = document.createElement('div');
@@ -221,31 +323,29 @@
       imgSrc: imageUrl,
       imgTotalW: 0, imgTotalH: 0,
       placedCount: 0,
-      tol: 0
+      tol: 0,
+      solved: false
     };
 
     var dragCtx = null;
 
     var TRAY_MIN_WIDTH = 170;
-    var BOARD_MIN_WIDTH = 340;
-    var BOARD_MAX_WIDTH = 1100;
+    var BOARD_WIDTH = 700; // fixed board size; only the tray flexes to fill remaining space
     var GAP = 22;
-    var SIDE_BY_SIDE_MIN = BOARD_MIN_WIDTH + GAP + TRAY_MIN_WIDTH; // 532
+    var SIDE_BY_SIDE_MIN = BOARD_WIDTH + GAP + TRAY_MIN_WIDTH;
 
     function computeTargetWidth(containerW){
       var stacked = containerW < SIDE_BY_SIDE_MIN;
       if(stacked){
-        // Not enough room for board + tray side by side: the tray will sit
-        // below the board (see the matching CSS), so let the board use the
-        // full available width instead of an arbitrary cap.
+        // Not enough room for the fixed-width board + tray side by side:
+        // the tray will sit below the board (see the matching CSS), so let
+        // the board use the full available width instead.
         return Math.max(280, containerW);
       }
-      // Side by side: give the board roughly two-thirds of the width and
-      // let the tray have the rest, rather than always maxing the board out
-      // and leaving the tray cramped at its bare minimum on wide pages.
-      var idealBoard = containerW * 0.68;
-      var maxAllowed = Math.min(BOARD_MAX_WIDTH, containerW - GAP - TRAY_MIN_WIDTH);
-      return Math.max(BOARD_MIN_WIDTH, Math.min(maxAllowed, idealBoard));
+      // Side by side: the board always renders at the same fixed width,
+      // regardless of how wide the container is. The tray (flex:1 in CSS)
+      // fills whatever space is left over beside it.
+      return BOARD_WIDTH;
     }
 
     function getGridNeighbor(piece, dr, dc){
@@ -257,10 +357,9 @@
     function updateProgress(){
       var total = state.rows*state.cols;
       progressEl.textContent = state.placedCount+' of '+total+' placed';
-      if(state.placedCount===total){
-        winBanner.classList.add('show');
-      } else {
-        winBanner.classList.remove('show');
+      if(state.placedCount===total && !state.solved){
+        state.solved = true;
+        openWinModal(container, onRestart);
       }
     }
 
@@ -516,6 +615,7 @@
       state.pieces.forEach(function(p){ p.placed=false; p.group=[p]; });
       state.slotFilled.forEach(function(row){ row.fill(false); });
       state.placedCount = 0;
+      state.solved = false;
       renderTray();
       updateProgress();
     }
