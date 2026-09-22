@@ -4,7 +4,7 @@ Tags: block, gutenberg, puzzle, game, image
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.19.1
+Stable tag: 1.21.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -33,6 +33,14 @@ into place.
 
 == Frequently Asked Questions ==
 
+= Can I restrict photos to specific tags? =
+
+Yes. In the block sidebar, use the "Tags (optional)" field to add one or more tags — it works just like WordPress's own tag field: type a tag and press Enter or comma to add it. Photos matching any of the tags you add will be shown; leave it blank to browse all photos. This can be combined with the contributor username restriction.
+
+= Can I restrict photos to one contributor? =
+
+Yes. Enter their WordPress.org Photo Directory username in the "Contributor username" field in the block sidebar (found under Post editor > block settings, e.g. `annezazu` for `https://wordpress.org/photos/author/annezazu/`). Every part of the picker (search, load more, random) and the `?image=` deep link will then only show/allow that person's photos. Leave it blank to browse the full directory.
+
 = Can I link directly to a specific photo's puzzle? =
 
 Yes. Add `?image=<ID>` to any page containing the block (the ID is the WordPress.org photo's numeric ID) and that puzzle loads directly, skipping the picker. Use the "Bookmark this image" button while solving a puzzle to get this link for the current photo. If Yoast SEO or All in One SEO is active, visiting a page this way also rewrites that plugin's og:image/twitter:image and og:description/twitter:description social sharing tags: the image becomes that specific photo, and the description becomes "Assemble this jigsaw puzzle!" followed by the photo's own description. If neither plugin is active, this part simply has no effect — the deep-linking itself still works either way.
@@ -54,6 +62,20 @@ Yes. Each block instance keeps its own state, so different visitors (or the same
 No. All photo searches go through a REST route registered by this plugin on your own site, which then queries wordpress.org server-side. Visitors' browsers never contact wordpress.org directly.
 
 == Changelog ==
+
+= 1.21.1 =
+* Fixed WPCS formatting issues in jigsaw_puzzle_parse_tag_ids_param(): the multi-line array_filter() call now has its opening parenthesis last on its line, one argument per line, and closing parenthesis on its own line. Also fixed a missing docblock for jigsaw_puzzle_search_photos() — a docblock had been accidentally left orphaned above the wrong function when a new function was inserted earlier; it's now correctly attached to jigsaw_puzzle_search_photos() with updated wording reflecting the author/tag filtering it now supports.
+
+= 1.21.0 =
+* Added a "Tags (optional)" field in the block sidebar, using WordPress's own tag/token input component (the same one used for post tags). Type a tag name and press Enter or comma to add it, exactly like the native WordPress tag field.
+* When one or more tags are set, the photo picker (search, load more, random, and the ?image= deep link) only includes photos matching at least one of those tags — an OR match, the same relationship WordPress's own taxonomy filtering uses by default.
+* Tag names are resolved to the Photo Directory's own photo_tag taxonomy term IDs via its REST endpoint (photo-tags), the same resolve-and-cache-permanently approach used for the contributor username. Tags that don't exist are silently skipped rather than breaking the search.
+* Like the author restriction, the ?image= deep link now also verifies the requested photo actually carries one of the configured tags, so it can't be used to bypass a tag restriction either.
+
+= 1.20.0 =
+* Added a "Contributor username (optional)" field in the block sidebar. When set, the photo picker (search, load more, random, and the ?image= deep link) is restricted to that one WordPress.org Photo Directory contributor's photos only.
+* The username is resolved to its numeric author ID by fetching the contributor's human-facing author archive page and reading the `author-<ID>` class WordPress puts on its `<body>` tag — this works for any contributor, unlike the wp/v2/users REST lookup approach, which doesn't resolve every account. The resolved ID is cached permanently (as an option, not a transient), since it never changes once assigned.
+* The ?image= deep link can no longer be used to bypass an author restriction: if a block is scoped to one contributor, requesting a photo ID belonging to someone else is rejected the same as a nonexistent ID.
 
 = 1.19.1 =
 * All modals (Solved!, image preview, bookmark) now ease in with a fade + subtle scale-up over about half a second, instead of appearing instantly.

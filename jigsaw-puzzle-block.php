@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Jigsaw Puzzle Block
  * Description:       Adds a "Jigsaw Puzzle" block. Each front-end visitor searches the WordPress.org Photo Directory and picks their own photo, which becomes an interactive drag-and-drop jigsaw puzzle with real interlocking pieces that snap together.
- * Version:           1.19.1
+ * Version:           1.21.1
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            topher1kenobe
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'JIGSAW_PUZZLE_BLOCK_VERSION', '1.19.1' );
+define( 'JIGSAW_PUZZLE_BLOCK_VERSION', '1.21.1' );
 define( 'JIGSAW_PUZZLE_BLOCK_DIR', plugin_dir_path( __FILE__ ) );
 define( 'JIGSAW_PUZZLE_BLOCK_URL', plugin_dir_url( __FILE__ ) );
 
@@ -94,6 +94,14 @@ function jigsaw_puzzle_register_routes() {
 					'type'    => 'integer',
 					'default' => 1,
 				),
+				'author' => array(
+					'type'    => 'integer',
+					'default' => 0,
+				),
+				'tags'   => array(
+					'type'    => 'string',
+					'default' => '',
+				),
 			),
 		)
 	);
@@ -106,9 +114,17 @@ function jigsaw_puzzle_register_routes() {
 			'callback'            => 'jigsaw_puzzle_get_photo_by_id',
 			'permission_callback' => '__return_true',
 			'args'                => array(
-				'id' => array(
+				'id'     => array(
 					'type'    => 'integer',
 					'default' => 0,
+				),
+				'author' => array(
+					'type'    => 'integer',
+					'default' => 0,
+				),
+				'tags'   => array(
+					'type'    => 'string',
+					'default' => '',
 				),
 			),
 		)
@@ -126,11 +142,24 @@ add_action( 'rest_api_init', 'jigsaw_puzzle_register_routes' );
  * @return WP_REST_Response|WP_Error
  */
 function jigsaw_puzzle_get_photo_by_id( $request ) {
-	$id = intval( $request->get_param( 'id' ) );
-	$photo = jigsaw_puzzle_fetch_photo_by_id( $id );
+	$id            = intval( $request->get_param( 'id' ) );
+	$expect_author = max( 0, intval( $request->get_param( 'author' ) ) );
+	$expect_tags   = jigsaw_puzzle_parse_tag_ids_param( $request->get_param( 'tags' ) );
+	$photo         = jigsaw_puzzle_fetch_photo_by_id( $id );
 
 	if ( false === $photo ) {
 		return new WP_Error( 'jigsaw_puzzle_not_found', __( 'No photo found with that ID.', 'jigsaw-puzzle-block' ), array( 'status' => 404 ) );
+	}
+
+	if ( $expect_author > 0 && ( ! isset( $photo['author'] ) || intval( $photo['author'] ) !== $expect_author ) ) {
+		return new WP_Error( 'jigsaw_puzzle_not_found', __( 'No photo found with that ID.', 'jigsaw-puzzle-block' ), array( 'status' => 404 ) );
+	}
+
+	if ( ! empty( $expect_tags ) ) {
+		$photo_tags = isset( $photo['tags'] ) && is_array( $photo['tags'] ) ? $photo['tags'] : array();
+		if ( empty( array_intersect( $expect_tags, $photo_tags ) ) ) {
+			return new WP_Error( 'jigsaw_puzzle_not_found', __( 'No photo found with that ID.', 'jigsaw-puzzle-block' ), array( 'status' => 404 ) );
+		}
 	}
 
 	return rest_ensure_response( $photo );
@@ -151,14 +180,14 @@ function jigsaw_puzzle_fetch_photo_by_id( $id ) {
 		return false;
 	}
 
-	$cache_key = 'jgp_photo_' . $id;
+	$cache_key = 'jgp_photo_v3_' . $id;
 	$cached    = get_transient( $cache_key );
 	if ( false !== $cached ) {
 		return empty( $cached['not_found'] ) ? $cached : false;
 	}
 
 	$url = add_query_arg(
-		array( '_fields' => 'id,link,content,featured_media,photo-thumbnail-url' ),
+		array( '_fields' => 'id,link,content,featured_media,photo-thumbnail-url,author,photo-tags' ),
 		'https://wordpress.org/photos/wp-json/wp/v2/photos/' . $id
 	);
 
@@ -183,6 +212,8 @@ function jigsaw_puzzle_fetch_photo_by_id( $id ) {
 
 	$result = array(
 		'id'          => $photo['id'],
+		'author'      => isset( $photo['author'] ) ? intval( $photo['author'] ) : 0,
+		'tags'        => isset( $photo['photo-tags'] ) && is_array( $photo['photo-tags'] ) ? array_map( 'intval', $photo['photo-tags'] ) : array(),
 		'thumbnail'   => isset( $photo['photo-thumbnail-url'] ) ? $photo['photo-thumbnail-url'] : '',
 		'full'        => isset( $media_map[ $media_id ] ) ? $media_map[ $media_id ] : '',
 		'description' => isset( $photo['content']['rendered'] ) ? wp_strip_all_tags( $photo['content']['rendered'] ) : '',
@@ -214,6 +245,114 @@ function jigsaw_puzzle_get_requested_image_id() {
 		return 0;
 	}
 	return (int) $raw;
+}
+
+/**
+ * Resolve a WordPress.org Photo Directory username to its numeric author
+ * ID by fetching the human-facing author archive page and reading the
+ * `author-<ID>` class WordPress puts on its <body> tag. This works
+ * regardless of account type (unlike the wp/v2/users REST lookup, which
+ * doesn't resolve every contributor), since every WordPress author archive
+ * carries this class as a core feature.
+ *
+ * The result is cached permanently as an option (not a transient): once
+ * assigned, a WordPress.org user's numeric ID never changes, so there's no
+ * need to ever re-fetch it once resolved.
+ *
+ * @param string $username WordPress.org Photo Directory username.
+ * @return int Numeric author ID, or 0 if it couldn't be resolved.
+ */
+function jigsaw_puzzle_resolve_author_id( $username ) {
+	$username = sanitize_title( $username );
+	if ( '' === $username ) {
+		return 0;
+	}
+
+	$option_key = 'jgp_author_id_' . $username;
+	$cached     = get_option( $option_key, false );
+	if ( false !== $cached ) {
+		return intval( $cached );
+	}
+
+	$url      = 'https://wordpress.org/photos/author/' . rawurlencode( $username ) . '/';
+	$response = wp_remote_get( $url, array( 'timeout' => 15 ) );
+	if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
+		return 0;
+	}
+
+	$body = wp_remote_retrieve_body( $response );
+	if ( ! preg_match( '/<body[^>]*\bclass="([^"]*)"/i', $body, $body_match ) ) {
+		return 0;
+	}
+	if ( ! preg_match( '/\bauthor-(\d+)\b/', $body_match[1], $id_match ) ) {
+		return 0;
+	}
+
+	$id = intval( $id_match[1] );
+	if ( $id > 0 ) {
+		update_option( $option_key, $id, false ); // Don't autoload: only needed on pages using this block.
+	}
+	return $id;
+}
+
+/**
+ * Resolve an array of tag names to their numeric term IDs in the
+ * WordPress.org Photo Directory's `photo_tag` taxonomy (REST base
+ * `photo-tags`), via that taxonomy's own REST endpoint. Unresolvable
+ * tag names are silently skipped rather than erroring out.
+ *
+ * Each result (including "doesn't exist") is cached permanently as an
+ * option, since a tag's term ID never changes once assigned.
+ *
+ * @param string[] $tag_names Raw tag names as typed by the site editor.
+ * @return int[] Resolved term IDs (deduplicated).
+ */
+function jigsaw_puzzle_resolve_tag_ids( $tag_names ) {
+	$ids = array();
+
+	foreach ( (array) $tag_names as $name ) {
+		$name = trim( (string) $name );
+		if ( '' === $name ) {
+			continue;
+		}
+		$slug = sanitize_title( $name );
+		if ( '' === $slug ) {
+			continue;
+		}
+
+		$option_key = 'jgp_tag_id_' . $slug;
+		$cached     = get_option( $option_key, false );
+		if ( false !== $cached ) {
+			if ( intval( $cached ) > 0 ) {
+				$ids[] = intval( $cached );
+			}
+			continue;
+		}
+
+		$url = add_query_arg(
+			array(
+				'slug'    => $slug,
+				'_fields' => 'id,slug',
+			),
+			'https://wordpress.org/photos/wp-json/wp/v2/photo-tags'
+		);
+
+		$response = wp_remote_get( $url, array( 'timeout' => 12 ) );
+		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
+			continue; // Transient failure: don't cache, so it's retried next time.
+		}
+
+		$terms = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( is_array( $terms ) && ! empty( $terms[0]['id'] ) ) {
+			$id = intval( $terms[0]['id'] );
+			update_option( $option_key, $id, false );
+			$ids[] = $id;
+		} else {
+			update_option( $option_key, 0, false ); // Genuinely doesn't exist: cache the negative result too.
+		}
+	}
+
+	return array_values( array_unique( $ids ) );
 }
 
 /**
@@ -394,19 +533,46 @@ function jigsaw_puzzle_register_aioseo_integration() {
 add_action( 'plugins_loaded', 'jigsaw_puzzle_register_aioseo_integration' );
 
 /**
+ * Parse a comma-separated string of tag term IDs (as passed between our
+ * own front end and REST routes) into a sanitized array of positive
+ * integers. Never trusts the raw value.
+ *
+ * @param mixed $raw Raw request param value.
+ * @return int[] Sanitized term IDs.
+ */
+function jigsaw_puzzle_parse_tag_ids_param( $raw ) {
+	$raw = (string) $raw;
+	if ( '' === $raw ) {
+		return array();
+	}
+	$parts = array_map( 'intval', explode( ',', $raw ) );
+	$parts = array_filter(
+		$parts,
+		function ( $n ) {
+			return $n > 0;
+		}
+	);
+	return array_values( array_unique( $parts ) );
+}
+
+/**
  * REST callback: search wordpress.org/photos and return a trimmed-down
- * result set with resolved full-size image URLs.
+ * result set with resolved full-size image URLs, optionally filtered by
+ * author and/or tags.
  *
  * @param WP_REST_Request $request Request object.
  * @return WP_REST_Response|WP_Error
  */
 function jigsaw_puzzle_search_photos( $request ) {
-	$search = sanitize_text_field( (string) $request->get_param( 'search' ) );
-	$search = substr( $search, 0, 100 );
-	$page   = max( 1, intval( $request->get_param( 'page' ) ) );
+	$search   = sanitize_text_field( (string) $request->get_param( 'search' ) );
+	$search   = substr( $search, 0, 100 );
+	$page     = max( 1, intval( $request->get_param( 'page' ) ) );
+	$author   = max( 0, intval( $request->get_param( 'author' ) ) );
+	$tag_ids  = jigsaw_puzzle_parse_tag_ids_param( $request->get_param( 'tags' ) );
+	$tags_key = implode( ',', $tag_ids );
 
 	$per_page  = 9;
-	$cache_key = 'jgp_search_v2_' . md5( $search . '|' . $page . '|' . $per_page );
+	$cache_key = 'jgp_search_v2_' . md5( $search . '|' . $page . '|' . $per_page . '|' . $author . '|' . $tags_key );
 	$cached    = get_transient( $cache_key );
 	if ( false !== $cached ) {
 		return rest_ensure_response( $cached );
@@ -419,6 +585,12 @@ function jigsaw_puzzle_search_photos( $request ) {
 	);
 	if ( '' !== $search ) {
 		$query_args['search'] = $search;
+	}
+	if ( $author > 0 ) {
+		$query_args['author'] = $author;
+	}
+	if ( ! empty( $tag_ids ) ) {
+		$query_args['photo-tags'] = $tags_key;
 	}
 
 	$url = add_query_arg( $query_args, 'https://wordpress.org/photos/wp-json/wp/v2/photos' );
@@ -576,12 +748,34 @@ function jigsaw_puzzle_render_block( $attributes ) {
 		$text_color
 	);
 
+	$photos_api_url = rest_url( 'jigsaw-puzzle/v1/photos' );
+	$photo_api_url  = rest_url( 'jigsaw-puzzle/v1/photo' );
+
+	$author_username = isset( $attributes['authorUsername'] ) ? sanitize_text_field( $attributes['authorUsername'] ) : '';
+	if ( '' !== $author_username ) {
+		$author_id = jigsaw_puzzle_resolve_author_id( $author_username );
+		if ( $author_id > 0 ) {
+			$photos_api_url = add_query_arg( array( 'author' => $author_id ), $photos_api_url );
+			$photo_api_url  = add_query_arg( array( 'author' => $author_id ), $photo_api_url );
+		}
+	}
+
+	$tag_names = isset( $attributes['tags'] ) && is_array( $attributes['tags'] ) ? $attributes['tags'] : array();
+	if ( ! empty( $tag_names ) ) {
+		$tag_ids = jigsaw_puzzle_resolve_tag_ids( $tag_names );
+		if ( ! empty( $tag_ids ) ) {
+			$tags_param     = implode( ',', $tag_ids );
+			$photos_api_url = add_query_arg( array( 'tags' => $tags_param ), $photos_api_url );
+			$photo_api_url  = add_query_arg( array( 'tags' => $tags_param ), $photo_api_url );
+		}
+	}
+
 	$wrapper_attributes = get_block_wrapper_attributes(
 		array(
 			'class'          => 'jigsaw-puzzle-block jigsaw-puzzle-app',
 			'style'          => $style,
-			'data-api'       => esc_url_raw( rest_url( 'jigsaw-puzzle/v1/photos' ) ),
-			'data-photo-api' => esc_url_raw( rest_url( 'jigsaw-puzzle/v1/photo' ) ),
+			'data-api'       => esc_url_raw( $photos_api_url ),
+			'data-photo-api' => esc_url_raw( $photo_api_url ),
 			'data-rows'      => $rows,
 			'data-cols'      => $cols,
 		)

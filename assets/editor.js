@@ -8,6 +8,8 @@
 	var PanelColorSettings = blockEditor.PanelColorSettings;
 	var PanelBody = components.PanelBody;
 	var RangeControl = components.RangeControl;
+	var TextControl = components.TextControl;
+	var FormTokenField = components.FormTokenField;
 	var __ = i18n.__;
 
 	registerBlockType( 'jigsaw-puzzle/puzzle', {
@@ -47,6 +49,30 @@
 						},
 						min: 2,
 						max: 20
+					} ),
+					el( TextControl, {
+						label: __( 'Contributor username (optional)', 'jigsaw-puzzle-block' ),
+						help: __(
+							'Restrict the photo picker to one WordPress.org Photo Directory contributor, e.g. annezazu. Leave blank to browse all photos.',
+							'jigsaw-puzzle-block'
+						),
+						value: attributes.authorUsername,
+						onChange: function ( v ) {
+							setAttributes( { authorUsername: v } );
+						}
+					} ),
+					el( FormTokenField, {
+						label: __( 'Tags (optional)', 'jigsaw-puzzle-block' ),
+						value: attributes.tags,
+						onChange: function ( tokens ) {
+							setAttributes( { tags: tokens } );
+						},
+						help: __(
+							'Type a tag and press Enter or comma to add it \u2014 same as WordPress\u2019 own tag field. Only photos matching at least one of these tags will be shown. Leave blank to browse all photos.',
+							'jigsaw-puzzle-block'
+						),
+						__experimentalExpandOnFocus: true,
+						__next40pxDefaultSize: true
 					} )
 				),
 				el( PanelColorSettings, {
