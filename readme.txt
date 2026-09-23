@@ -4,7 +4,7 @@ Tags: block, gutenberg, puzzle, game, image
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.21.1
+Stable tag: 1.21.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -62,6 +62,9 @@ Yes. Each block instance keeps its own state, so different visitors (or the same
 No. All photo searches go through a REST route registered by this plugin on your own site, which then queries wordpress.org server-side. Visitors' browsers never contact wordpress.org directly.
 
 == Changelog ==
+
+= 1.21.2 =
+* Removed the "Choose a photo for your puzzle" intro text above the search box.
 
 = 1.21.1 =
 * Fixed WPCS formatting issues in jigsaw_puzzle_parse_tag_ids_param(): the multi-line array_filter() call now has its opening parenthesis last on its line, one argument per line, and closing parenthesis on its own line. Also fixed a missing docblock for jigsaw_puzzle_search_photos() — a docblock had been accidentally left orphaned above the wrong function when a new function was inserted earlier; it's now correctly attached to jigsaw_puzzle_search_photos() with updated wording reflecting the author/tag filtering it now supports.

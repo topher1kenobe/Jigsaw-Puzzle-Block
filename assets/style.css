@@ -115,13 +115,6 @@
 .jgp-picker{
   max-width: 900px;
 }
-.jgp-picker-intro{
-  font-family:Georgia,serif;
-  font-size:18px;
-  font-weight:600;
-  color:var(--jgp-cream);
-  margin:0 0 14px;
-}
 .jgp-picker-form{
   display:flex;
   gap:10px;

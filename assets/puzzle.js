@@ -691,11 +691,6 @@
     var picker = document.createElement('div');
     picker.className = 'jgp-picker';
 
-    var intro = document.createElement('p');
-    intro.className = 'jgp-picker-intro';
-    intro.textContent = 'Choose a photo for your puzzle';
-    picker.appendChild(intro);
-
     var form = document.createElement('form');
     form.className = 'jgp-picker-form';
     var input = document.createElement('input');
