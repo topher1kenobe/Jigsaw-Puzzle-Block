@@ -4,7 +4,7 @@ Tags: block, gutenberg, puzzle, game, image
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.21.2
+Stable tag: 1.22.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -32,6 +32,10 @@ into place.
 4. Publish. Visitors will search for and pick their own photo directly on the page.
 
 == Frequently Asked Questions ==
+
+= Can visitors change how the puzzle looks? =
+
+Yes. While assembling a puzzle, a small color swatch (marked with a rainbow color-wheel badge) next to the other buttons lets each visitor pick their own color for the board/mat. It's remembered in their browser (via localStorage) for next time, and is separate from the Board color you set in the block's own settings — visitors can't change the colors you've configured for everyone else, only their own view.
 
 = Can I restrict photos to specific tags? =
 
@@ -62,6 +66,15 @@ Yes. Each block instance keeps its own state, so different visitors (or the same
 No. All photo searches go through a REST route registered by this plugin on your own site, which then queries wordpress.org server-side. Visitors' browsers never contact wordpress.org directly.
 
 == Changelog ==
+
+= 1.22.2 =
+* The visitor color swatch now changes the board/mat (--jgp-board) instead of the outer app background (--jgp-bg) — matching what people actually pointed at when asking for this. Also added a small rainbow color-wheel badge overlaid on the corner of the swatch so its purpose is clear regardless of what color is currently selected inside it.
+
+= 1.22.1 =
+* Fixed the background color swatch not opening a color picker on click. It was styled with all:unset and appearance:none (the same hardening used for buttons/inputs elsewhere), but for input[type=color] specifically, removing the native appearance can disable its click-to-open picker behavior entirely, not just its visual chrome. Restyled with only cosmetic properties (border, size, background) and left its native appearance alone.
+
+= 1.22.0 =
+* Added a background color picker (a native color swatch input) in the puzzle-assembly controls row, letting each visitor change the background color to their own preference. Persisted via localStorage, so it's remembered on that visitor's browser across page loads and applies consistently to both the photo picker and the assembly view — separate from (and layered on top of) the Background color the site editor sets in the block's own settings.
 
 = 1.21.2 =
 * Removed the "Choose a photo for your puzzle" intro text above the search box.

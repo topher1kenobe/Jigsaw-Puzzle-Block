@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Jigsaw Puzzle Block
  * Description:       Adds a "Jigsaw Puzzle" block. Each front-end visitor searches the WordPress.org Photo Directory and picks their own photo, which becomes an interactive drag-and-drop jigsaw puzzle with real interlocking pieces that snap together.
- * Version:           1.21.2
+ * Version:           1.22.2
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            topher1kenobe
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'JIGSAW_PUZZLE_BLOCK_VERSION', '1.21.2' );
+define( 'JIGSAW_PUZZLE_BLOCK_VERSION', '1.22.2' );
 define( 'JIGSAW_PUZZLE_BLOCK_DIR', plugin_dir_path( __FILE__ ) );
 define( 'JIGSAW_PUZZLE_BLOCK_URL', plugin_dir_url( __FILE__ ) );
 

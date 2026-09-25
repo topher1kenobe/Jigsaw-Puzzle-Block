@@ -282,6 +282,35 @@
       openBookmarkModal(container, url.toString());
     });
 
+    var boardColorWrap = document.createElement('div');
+    boardColorWrap.className = 'jgp-board-color-wrap';
+
+    var boardColorInput = document.createElement('input');
+    boardColorInput.type = 'color';
+    boardColorInput.className = 'jgp-board-color-input';
+    boardColorInput.title = 'Change board color';
+    boardColorInput.setAttribute('aria-label', 'Board color');
+    var currentBoardColor = getComputedStyle(container).getPropertyValue('--jgp-board').trim().toLowerCase();
+    if(!/^#[0-9a-f]{6}$/.test(currentBoardColor)){
+      currentBoardColor = '#ebecfe';
+    }
+    boardColorInput.value = currentBoardColor;
+    boardColorInput.addEventListener('input', function(){
+      container.style.setProperty('--jgp-board', boardColorInput.value);
+      try {
+        window.localStorage.setItem(BOARD_COLOR_STORAGE_KEY, boardColorInput.value);
+      } catch(e){
+        // localStorage unavailable -- the color still applies for this view, just won't persist.
+      }
+    });
+
+    var boardColorIcon = document.createElement('span');
+    boardColorIcon.className = 'jgp-board-color-icon';
+    boardColorIcon.setAttribute('aria-hidden', 'true');
+
+    boardColorWrap.appendChild(boardColorInput);
+    boardColorWrap.appendChild(boardColorIcon);
+
     var trayLabel = document.createElement('span');
     trayLabel.className = 'jgp-tray-label';
     trayLabel.textContent = 'Pile \u2014 drag a piece onto the board';
@@ -290,6 +319,7 @@
     controls.appendChild(shuffleBtn);
     controls.appendChild(viewImageBtn);
     controls.appendChild(bookmarkBtn);
+    controls.appendChild(boardColorWrap);
     controls.appendChild(trayLabel);
     controls.appendChild(progressEl);
 
@@ -1023,12 +1053,26 @@
       });
   }
 
+  var BOARD_COLOR_STORAGE_KEY = 'jgp_board_color';
+
+  function applySavedBoardColor(node){
+    try {
+      var saved = window.localStorage.getItem(BOARD_COLOR_STORAGE_KEY);
+      if(saved){
+        node.style.setProperty('--jgp-board', saved);
+      }
+    } catch(e){
+      // localStorage unavailable (private browsing, disabled, etc.) -- just skip persistence.
+    }
+  }
+
   function initAll(){
     var nodes = document.querySelectorAll('.jigsaw-puzzle-app');
     var requestedImageId = getRequestedImageId();
     nodes.forEach(function(node){
       if(node.getAttribute('data-jgp-ready')) return;
       node.setAttribute('data-jgp-ready','1');
+      applySavedBoardColor(node);
       var apiUrl = node.getAttribute('data-api');
       var photoApiUrl = node.getAttribute('data-photo-api');
       var rows = parseInt(node.getAttribute('data-rows'),10) || 8;
