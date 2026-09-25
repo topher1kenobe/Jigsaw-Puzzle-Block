@@ -4,7 +4,7 @@ Tags: block, gutenberg, puzzle, game, image
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.22.2
+Stable tag: 1.23.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -66,6 +66,9 @@ Yes. Each block instance keeps its own state, so different visitors (or the same
 No. All photo searches go through a REST route registered by this plugin on your own site, which then queries wordpress.org server-side. Visitors' browsers never contact wordpress.org directly.
 
 == Changelog ==
+
+= 1.23.0 =
+* The board color swatch now opens an in-page popover with 8 preset colors that apply instantly, instead of immediately opening the browser's native OS-level color panel. This works around a real macOS/Safari quirk where that native panel can open on a different Space/Desktop than the one you're on, making it seem to vanish. A "Custom..." color input is still available inside the popover for picking an exact color, for anyone who wants one and doesn't mind the occasional native-panel quirk; the popover itself stays open and easy to find either way.
 
 = 1.22.2 =
 * The visitor color swatch now changes the board/mat (--jgp-board) instead of the outer app background (--jgp-bg) — matching what people actually pointed at when asking for this. Also added a small rainbow color-wheel badge overlaid on the corner of the swatch so its purpose is clear regardless of what color is currently selected inside it.

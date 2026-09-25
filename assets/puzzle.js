@@ -282,34 +282,97 @@
       openBookmarkModal(container, url.toString());
     });
 
+    var BOARD_COLOR_PRESETS = ['#ffffff','#f5f5f0','#ebecfe','#dbeeff','#e8f5e9','#fdebd0','#2d2d2d','#1f3d2e'];
+
     var boardColorWrap = document.createElement('div');
     boardColorWrap.className = 'jgp-board-color-wrap';
 
-    var boardColorInput = document.createElement('input');
-    boardColorInput.type = 'color';
-    boardColorInput.className = 'jgp-board-color-input';
-    boardColorInput.title = 'Change board color';
-    boardColorInput.setAttribute('aria-label', 'Board color');
     var currentBoardColor = getComputedStyle(container).getPropertyValue('--jgp-board').trim().toLowerCase();
     if(!/^#[0-9a-f]{6}$/.test(currentBoardColor)){
       currentBoardColor = '#ebecfe';
     }
-    boardColorInput.value = currentBoardColor;
-    boardColorInput.addEventListener('input', function(){
-      container.style.setProperty('--jgp-board', boardColorInput.value);
+
+    function applyBoardColor(hex){
+      currentBoardColor = hex;
+      container.style.setProperty('--jgp-board', hex);
+      swatchBtn.style.background = hex;
       try {
-        window.localStorage.setItem(BOARD_COLOR_STORAGE_KEY, boardColorInput.value);
+        window.localStorage.setItem(BOARD_COLOR_STORAGE_KEY, hex);
       } catch(e){
         // localStorage unavailable -- the color still applies for this view, just won't persist.
       }
-    });
+    }
+
+    var swatchBtn = document.createElement('button');
+    swatchBtn.type = 'button';
+    swatchBtn.className = 'jgp-board-color-swatch';
+    swatchBtn.title = 'Change board color';
+    swatchBtn.setAttribute('aria-label', 'Board color');
+    swatchBtn.style.background = currentBoardColor;
 
     var boardColorIcon = document.createElement('span');
     boardColorIcon.className = 'jgp-board-color-icon';
     boardColorIcon.setAttribute('aria-hidden', 'true');
 
-    boardColorWrap.appendChild(boardColorInput);
+    var popover = document.createElement('div');
+    popover.className = 'jgp-board-color-popover';
+    popover.hidden = true;
+
+    var presetGrid = document.createElement('div');
+    presetGrid.className = 'jgp-board-color-presets';
+    BOARD_COLOR_PRESETS.forEach(function(hex){
+      var presetBtn = document.createElement('button');
+      presetBtn.type = 'button';
+      presetBtn.className = 'jgp-board-color-preset';
+      presetBtn.style.background = hex;
+      presetBtn.title = hex;
+      presetBtn.setAttribute('aria-label', 'Set board color to ' + hex);
+      presetBtn.addEventListener('click', function(){
+        applyBoardColor(hex);
+        closePopover();
+      });
+      presetGrid.appendChild(presetBtn);
+    });
+
+    var customLabel = document.createElement('label');
+    customLabel.className = 'jgp-board-color-custom-label';
+    var customText = document.createElement('span');
+    customText.textContent = 'Custom\u2026';
+    var boardColorInput = document.createElement('input');
+    boardColorInput.type = 'color';
+    boardColorInput.className = 'jgp-board-color-input';
+    boardColorInput.title = 'Pick an exact custom color';
+    boardColorInput.setAttribute('aria-label', 'Custom board color');
+    boardColorInput.value = currentBoardColor;
+    boardColorInput.addEventListener('input', function(){
+      applyBoardColor(boardColorInput.value);
+    });
+    customLabel.appendChild(customText);
+    customLabel.appendChild(boardColorInput);
+
+    popover.appendChild(presetGrid);
+    popover.appendChild(customLabel);
+
+    function openPopover(){
+      popover.hidden = false;
+      document.addEventListener('mousedown', handleOutsideClick, true);
+    }
+    function closePopover(){
+      popover.hidden = true;
+      document.removeEventListener('mousedown', handleOutsideClick, true);
+    }
+    function handleOutsideClick(e){
+      if(!boardColorWrap.contains(e.target)){
+        closePopover();
+      }
+    }
+    swatchBtn.addEventListener('click', function(){
+      if(popover.hidden){ openPopover(); } else { closePopover(); }
+    });
+
+    boardColorWrap.appendChild(swatchBtn);
     boardColorWrap.appendChild(boardColorIcon);
+    boardColorWrap.appendChild(popover);
 
     var trayLabel = document.createElement('span');
     trayLabel.className = 'jgp-tray-label';
