@@ -4,7 +4,7 @@ Tags: block, gutenberg, puzzle, game, image
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.23.0
+Stable tag: 1.24.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -66,6 +66,12 @@ Yes. Each block instance keeps its own state, so different visitors (or the same
 No. All photo searches go through a REST route registered by this plugin on your own site, which then queries wordpress.org server-side. Visitors' browsers never contact wordpress.org directly.
 
 == Changelog ==
+
+= 1.24.0 =
+Security audit and hardening:
+* Added per-IP rate limiting (60 requests/minute, configurable via the JIGSAW_PUZZLE_RATE_LIMIT_PER_MINUTE constant) to both public REST routes. Without it, an unauthenticated caller could script requests with random search terms to trivially bypass caching and force a fresh outbound request to wordpress.org on every hit, potentially exhausting PHP workers or getting the site's IP flagged for abusive traffic.
+* The third-party `link` field (used as a real clickable href for photo attribution) is now validated to actually be an https://wordpress.org/ URL before use, rather than trusted at face value; anything else is dropped to an empty string. `thumbnail`/`full` URLs are also run through esc_url_raw() as routine hardening.
+* Documented (but did not change, pending a decision) that the author/tag content restrictions are currently enforced client-side only — a visitor who calls the REST route directly with different params can browse outside the configured restriction. Since the underlying data is WordPress.org's public photo directory, this isn't a confidentiality issue, but closing it properly would require a signed server-side token rather than trusting client-supplied author/tags params.
 
 = 1.23.0 =
 * The board color swatch now opens an in-page popover with 8 preset colors that apply instantly, instead of immediately opening the browser's native OS-level color panel. This works around a real macOS/Safari quirk where that native panel can open on a different Space/Desktop than the one you're on, making it seem to vanish. A "Custom..." color input is still available inside the popover for picking an exact color, for anyone who wants one and doesn't mind the occasional native-panel quirk; the popover itself stays open and easy to find either way.

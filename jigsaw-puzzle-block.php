@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Jigsaw Puzzle Block
  * Description:       Adds a "Jigsaw Puzzle" block. Each front-end visitor searches the WordPress.org Photo Directory and picks their own photo, which becomes an interactive drag-and-drop jigsaw puzzle with real interlocking pieces that snap together.
- * Version:           1.23.0
+ * Version:           1.24.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            topher1kenobe
@@ -17,9 +17,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'JIGSAW_PUZZLE_BLOCK_VERSION', '1.23.0' );
+define( 'JIGSAW_PUZZLE_BLOCK_VERSION', '1.24.0' );
 define( 'JIGSAW_PUZZLE_BLOCK_DIR', plugin_dir_path( __FILE__ ) );
 define( 'JIGSAW_PUZZLE_BLOCK_URL', plugin_dir_url( __FILE__ ) );
+define( 'JIGSAW_PUZZLE_RATE_LIMIT_PER_MINUTE', 60 );
 
 /**
  * Register the plugin's scripts and styles ahead of block registration,
@@ -133,6 +134,48 @@ function jigsaw_puzzle_register_routes() {
 add_action( 'rest_api_init', 'jigsaw_puzzle_register_routes' );
 
 /**
+ * Very lightweight per-IP rate limit for the public REST routes, since
+ * they're unauthenticated and each request can trigger outbound HTTP
+ * calls to wordpress.org. Not a hard security boundary (REMOTE_ADDR can
+ * be a shared proxy/CDN IP in some hosting setups) — just enough to stop
+ * casual scripted abuse from tying up PHP workers or getting the site's
+ * IP flagged by wordpress.org for abusive traffic patterns.
+ *
+ * @return bool True if the request should proceed, false if rate-limited.
+ */
+function jigsaw_puzzle_check_rate_limit() {
+	$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : 'unknown';
+	$key   = 'jgp_rl_' . md5( $ip );
+	$count = get_transient( $key );
+	if ( false === $count ) {
+		set_transient( $key, 1, MINUTE_IN_SECONDS );
+		return true;
+	}
+	if ( $count >= JIGSAW_PUZZLE_RATE_LIMIT_PER_MINUTE ) {
+		return false;
+	}
+	set_transient( $key, $count + 1, MINUTE_IN_SECONDS );
+	return true;
+}
+
+/**
+ * Sanitize a URL that's expected to point at wordpress.org (used for the
+ * attribution link), rejecting anything that isn't actually an
+ * https://wordpress.org/ URL rather than trusting the third-party field
+ * at face value.
+ *
+ * @param string $url Candidate URL.
+ * @return string The sanitized URL, or '' if it doesn't match.
+ */
+function jigsaw_puzzle_sanitize_wp_org_link( $url ) {
+	$url = esc_url_raw( (string) $url );
+	if ( 0 !== strpos( $url, 'https://wordpress.org/' ) ) {
+		return '';
+	}
+	return $url;
+}
+
+/**
  * REST callback: fetch a single photo by ID from wordpress.org and validate
  * that it actually exists, for the ?image= deep-link feature. Never trusts
  * the ID at face value — a request for a nonexistent or malformed ID gets a
@@ -142,6 +185,10 @@ add_action( 'rest_api_init', 'jigsaw_puzzle_register_routes' );
  * @return WP_REST_Response|WP_Error
  */
 function jigsaw_puzzle_get_photo_by_id( $request ) {
+	if ( ! jigsaw_puzzle_check_rate_limit() ) {
+		return new WP_Error( 'jigsaw_puzzle_rate_limited', __( 'Too many requests. Please slow down and try again shortly.', 'jigsaw-puzzle-block' ), array( 'status' => 429 ) );
+	}
+
 	$id            = intval( $request->get_param( 'id' ) );
 	$expect_author = max( 0, intval( $request->get_param( 'author' ) ) );
 	$expect_tags   = jigsaw_puzzle_parse_tag_ids_param( $request->get_param( 'tags' ) );
@@ -214,10 +261,10 @@ function jigsaw_puzzle_fetch_photo_by_id( $id ) {
 		'id'          => $photo['id'],
 		'author'      => isset( $photo['author'] ) ? intval( $photo['author'] ) : 0,
 		'tags'        => isset( $photo['photo-tags'] ) && is_array( $photo['photo-tags'] ) ? array_map( 'intval', $photo['photo-tags'] ) : array(),
-		'thumbnail'   => isset( $photo['photo-thumbnail-url'] ) ? $photo['photo-thumbnail-url'] : '',
-		'full'        => isset( $media_map[ $media_id ] ) ? $media_map[ $media_id ] : '',
+		'thumbnail'   => isset( $photo['photo-thumbnail-url'] ) ? esc_url_raw( $photo['photo-thumbnail-url'] ) : '',
+		'full'        => isset( $media_map[ $media_id ] ) ? esc_url_raw( $media_map[ $media_id ] ) : '',
 		'description' => isset( $photo['content']['rendered'] ) ? wp_strip_all_tags( $photo['content']['rendered'] ) : '',
-		'link'        => isset( $photo['link'] ) ? $photo['link'] : '',
+		'link'        => isset( $photo['link'] ) ? jigsaw_puzzle_sanitize_wp_org_link( $photo['link'] ) : '',
 	);
 
 	if ( empty( $result['full'] ) ) {
@@ -564,6 +611,10 @@ function jigsaw_puzzle_parse_tag_ids_param( $raw ) {
  * @return WP_REST_Response|WP_Error
  */
 function jigsaw_puzzle_search_photos( $request ) {
+	if ( ! jigsaw_puzzle_check_rate_limit() ) {
+		return new WP_Error( 'jigsaw_puzzle_rate_limited', __( 'Too many requests. Please slow down and try again shortly.', 'jigsaw-puzzle-block' ), array( 'status' => 429 ) );
+	}
+
 	$search   = sanitize_text_field( (string) $request->get_param( 'search' ) );
 	$search   = substr( $search, 0, 100 );
 	$page     = max( 1, intval( $request->get_param( 'page' ) ) );
@@ -621,10 +672,10 @@ function jigsaw_puzzle_search_photos( $request ) {
 		$media_id  = ! empty( $photo['featured_media'] ) ? intval( $photo['featured_media'] ) : 0;
 		$results[] = array(
 			'id'          => $photo['id'],
-			'thumbnail'   => isset( $photo['photo-thumbnail-url'] ) ? $photo['photo-thumbnail-url'] : '',
-			'full'        => isset( $media_map[ $media_id ] ) ? $media_map[ $media_id ] : '',
+			'thumbnail'   => isset( $photo['photo-thumbnail-url'] ) ? esc_url_raw( $photo['photo-thumbnail-url'] ) : '',
+			'full'        => isset( $media_map[ $media_id ] ) ? esc_url_raw( $media_map[ $media_id ] ) : '',
 			'description' => isset( $photo['content']['rendered'] ) ? wp_strip_all_tags( $photo['content']['rendered'] ) : '',
-			'link'        => isset( $photo['link'] ) ? $photo['link'] : '',
+			'link'        => isset( $photo['link'] ) ? jigsaw_puzzle_sanitize_wp_org_link( $photo['link'] ) : '',
 		);
 	}
 
